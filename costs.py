@@ -146,20 +146,32 @@ plt.tight_layout()
 plt.savefig(os.path.join(os.getcwd(), 'img', 'total_costs_including_retail.png'))
 plt.close()
 
+
+
 # new purchase of $200 barrel
 new = usage.copy()
-new['cum_total_costs'] = new['cum_total_costs'] - 200
+multiplier = 1 # (2/3)
+oz_per_refill = 135*multiplier
+new['cum_oz'] = new['cum_refills'] * oz_per_refill
+new.at[0, 'startup_costs'] -= 200
+new['maintenance_costs'] = new['maintenance_costs']*multiplier
+new['cum_maintenance_costs'] = new['maintenance_costs'].cumsum()
+new['total_costs'] = new['startup_costs'] + new['maintenance_costs']
+new['cum_startup_costs'] = new['startup_costs'].cumsum()
+new['cum_total_costs'] = new['total_costs'].cumsum()
 new['cost_per_oz'] = new['cum_total_costs'] / new['cum_oz']
 new['Cost per 16oz'] = new['cost_per_oz'] * 16
-new[new['Years'].isin([1,2,3,4,5])].groupby("Years")['Cost per 16oz'].last()
+new['cost_per_month'] = new['cum_total_costs'] / new['num_months']
+new['maintenance_costs_per_month'] = new['cum_maintenance_costs'] / new['num_months']
 
 cum_total_costs = new['cum_total_costs'].values[-1]
 cum_refills = new['cum_refills'].values[-1]
 num_months = new['num_months'].values[-1]
-new_extended = new[['cum_total_costs', 'num_months', 'cum_refills']].copy()
+maintenance_costs_per_month = new['maintenance_costs_per_month'].values[-1] # 9.99824561403509
+new_extended = new[['cum_total_costs', 'num_months', 'cum_refills', 'startup_costs']].copy()
 new_extended['Data'] = 'Real'
 additional = []
-for month in range(1, 64):
+for month in range(1, 124):
     cum_total_costs += maintenance_costs_per_month
     cum_refills += avg_refills_per_month
     num_months += 1
@@ -168,9 +180,33 @@ for month in range(1, 64):
         'cum_refills': cum_refills,
         'num_months': num_months,
         'Data': 'Projected',
+        'startup_costs': 0,
     })
 new_extended = pd.concat([new_extended, pd.DataFrame(additional)], sort=False, ignore_index=False)
 new_extended['Years'] = new_extended['num_months'] / 12
 new_extended['cum_oz'] = new_extended['cum_refills'] * oz_per_refill
 new_extended['cost_per_oz'] = new_extended['cum_total_costs'] / new_extended['cum_oz']
 new_extended['Cost per 16oz'] = new_extended['cost_per_oz'] * 16
+new_extended['cum_startup_costs'] = new_extended['startup_costs'].cumsum()
+new_extended['cost_per_month'] = new_extended['cum_total_costs'] / new_extended['num_months']
+new_extended['maintenance_costs_per_month'] = \
+    (new_extended['cum_total_costs'] - new_extended['cum_startup_costs']) \
+    / new_extended['num_months']
+
+print(new[new['Years'].isin([1,2,3,4,4.75])].groupby("Years")[['Cost per 16oz','maintenance_costs_per_month']].last())
+print(new_extended[new_extended['Years'].isin([5,10, 15])].groupby("Years")[['Cost per 16oz','maintenance_costs_per_month']].last())
+
+
+
+
+
+
+
+
+
+
+14.070556
+9.595278
+7.882963
+8.040139
+6.880468
